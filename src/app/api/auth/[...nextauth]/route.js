@@ -1,18 +1,24 @@
-import NextAuth from "next-auth";
-import GithubProvider from "next-auth/providers/github";
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]/route";
 
-export const authOptions = {
-  providers: [
-    GithubProvider({
-      clientId: process.env.GITHUB_ID,
-      clientSecret: process.env.GITHUB_SECRET,
-    }),
-  ],
-  secret: process.env.NEXTAUTH_SECRET,
-  pages: {
-    signIn: "/login", // Redirects users to our custom login page
-  },
-};
+export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+  try {
+    const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_sessions?user_email=eq.${session.user.email}&select=*`, {
+      headers: {
+        "apikey": process.env.SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${process.env.SUPABASE_ANON_KEY}`
+      }
+    });
+    
+    const data = await res.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    return NextResponse.json([], { status: 500 });
+  }
+}
