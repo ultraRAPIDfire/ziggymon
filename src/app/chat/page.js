@@ -4,6 +4,17 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Send, LogOut, Terminal, Cpu } from "lucide-react";
 
+const [chatSessions, setChatSessions] = useState([]);
+
+useEffect(() => {
+  if (status === "authenticated") {
+    fetch("/api/sessions")
+      .then((res) => res.json())
+      .then((data) => setChatSessions(data || []))
+      .catch(() => {});
+  }
+}, [status]);
+
 export default function ChatPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -64,7 +75,16 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-screen bg-zinc-950 text-zinc-100 font-sans">
-      {/* Sidebar Layout */}
+      {<div className="flex-1 overflow-y-auto mt-4 space-y-2">
+  {chatSessions.map((chat) => (
+    <div 
+      key={chat.id} 
+      className="p-2 text-sm rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800/80 cursor-pointer truncate text-zinc-300 font-mono transition-colors"
+    >
+      {chat.title}
+    </div>
+  ))}
+</div>}
       <div className="w-64 border-r border-zinc-800 bg-zinc-900 flex flex-col justify-between p-4">
         <div className="space-y-6">
           <div className="flex items-center gap-2 text-orange-400 font-bold text-xl">
