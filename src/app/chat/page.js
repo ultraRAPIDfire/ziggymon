@@ -49,23 +49,26 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-    // Hard-code a fallback check right inside the call to prevent compilation dropouts
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || "https://n8n.srv1769884.hstgr.cloud/webhook/chat";
+      // Robust webhook resolution with explicit production fallback string
+      const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || "https://n8n.srv1769884.hstgr.cloud/webhook/chat";
 
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: input,
-        sessionId: session?.user?.email || "anonymous_session",
-      }),
-    });
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: input,
+          sessionId: session?.user?.email || "anonymous_session",
+        }),
+      });
 
       const data = await response.json();
       
+      // Dynamically extract text regardless of how your n8n Respond Node is structured
+      const aiText = data.response || data.output || data.text || (typeof data === "string" ? data : JSON.stringify(data));
+      
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: data.response || "No response received." },
+        { role: "assistant", text: aiText || "No readable string payload returned from network." },
       ]);
     } catch (error) {
       setMessages((prev) => [
@@ -90,7 +93,7 @@ export default function ChatPage() {
           
           <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-2">Active Dev Session</div>
           
-          {/* Properly structured historical memory container inside the sidebar shell */}
+          {/* Historical memory list rendered safely inside the sidebar layout flow */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
             {chatSessions.map((chat) => (
               <div 
