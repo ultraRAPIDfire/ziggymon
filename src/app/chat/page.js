@@ -11,7 +11,18 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [chatSessions, setChatSessions] = useState([]);
+  
+  // Track a dedicated, unique session ID per page instance
+  const [currentSessionId, setCurrentSessionId] = useState("");
   const messagesEndRef = useRef(null);
+
+  // Initialize a unique session ID once authenticated
+  useEffect(() => {
+    if (status === "authenticated" && !currentSessionId) {
+      const uniqueId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentSessionId(uniqueId);
+    }
+  }, [status, currentSessionId]);
 
   // Fetch sidebar sessions once authenticated
   useEffect(() => {
@@ -49,7 +60,6 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      // Robust webhook resolution with explicit production fallback string
       const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || "https://n8n.srv1769884.hstgr.cloud/webhook/chat";
 
       const response = await fetch(webhookUrl, {
@@ -57,7 +67,8 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: input,
-          sessionId: session?.user?.email || "anonymous_session",
+          sessionId: currentSessionId, // Passes the unique session identifier to pass database rules
+          userEmail: session?.user?.email || "anonymous", // Still passes the user profile mapping smoothly
         }),
       });
 
