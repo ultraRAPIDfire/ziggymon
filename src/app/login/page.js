@@ -7,10 +7,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl">
         <div className="text-center">
           <h2 className="text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">
-            Ziggymon AI
+            Z-engine
           </h2>
           <p className="mt-2 text-sm text-zinc-400">
-            The dedicated programming intelligence suite.
+            AI agent dedicated for smart programming support
           </p>
         </div>
         <div className="mt-8">
