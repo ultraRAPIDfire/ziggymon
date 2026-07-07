@@ -2,9 +2,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Send, LogOut, Terminal, Cpu, Sun, Moon, Check, Copy, Edit2, X, ShieldAlert, Trash2 } from "lucide-react";
+import { Send, LogOut, Terminal, Cpu, Sun, Moon, Check, Copy, Edit2, X, ShieldAlert, Trash2, Menu } from "lucide-react";
 
-// Sub-component to manage copy interaction cleanly for code snippets
 function CodeSnippetBlock({ code, language }) {
   const [copied, setCopied] = useState(false);
 
@@ -19,7 +18,7 @@ function CodeSnippetBlock({ code, language }) {
   };
 
   return (
-    <div className="my-3 rounded-lg overflow-hidden border border-zinc-700/50 bg-zinc-950 font-mono text-xs shadow-inner">
+    <div className="my-3 rounded-lg overflow-hidden border border-zinc-700/50 bg-zinc-950 font-mono text-xs shadow-inner max-w-full">
       <div className="bg-zinc-900 px-4 py-1.5 flex justify-between items-center border-b border-zinc-800/80 text-zinc-400">
         <span className="text-[10px] uppercase tracking-wider font-semibold text-orange-500/80">{language || "code"}</span>
         <button
@@ -31,7 +30,7 @@ function CodeSnippetBlock({ code, language }) {
           <span>{copied ? "Copied" : "Copy"}</span>
         </button>
       </div>
-      <pre className="p-4 overflow-x-auto whitespace-pre text-zinc-100 selection:bg-orange-500/20">
+      <pre className="p-3 sm:p-4 overflow-x-auto whitespace-pre text-zinc-100 selection:bg-orange-500/20 text-[11px] sm:text-xs">
         <code>{code}</code>
       </pre>
     </div>
@@ -49,16 +48,12 @@ export default function ChatPage() {
   const [currentSessionId, setCurrentSessionId] = useState("");
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile Navigation State
   const messagesEndRef = useRef(null);
 
-  // States for dynamic inline session title modification
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
-
-  // Ephemeral mode state configuration
   const [isTemporaryMode, setIsTemporaryMode] = useState(false);
-
-  // Reference tracker to discard race conditions on fast session swaps
   const abortControllerRef = useRef(null);
 
   useEffect(() => {
@@ -107,6 +102,7 @@ export default function ChatPage() {
 
   const handleSelectSession = async (sessionId) => {
     setIsTemporaryMode(false);
+    setIsSidebarOpen(false); // Dismiss drawer overlay on mobile viewport clicks
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -212,16 +208,12 @@ export default function ChatPage() {
     }
   };
 
-  // Feature: Delete single active session item row context
   const handleDeleteSession = async (e, sessionId) => {
-    e.stopPropagation(); // Avoid triggering chat row selection on click event bubbles
-    
+    e.stopPropagation();
     if (!confirm("Confirm removal of this transaction matrix register?")) return;
 
-    // Reactively purge item from local tracking list states instantly
     setChatSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
     
-    // Clear chat canvas viewport frame if the user purges the conversation they are looking at
     if (currentSessionId === sessionId) {
       setMessages([]);
       generateNewSessionToken();
@@ -235,14 +227,14 @@ export default function ChatPage() {
     }
   };
 
-  // Feature: Wipe out entire directory stack sequence
   const handleDeleteAllSessions = async () => {
-    if (!confirm("CRITICAL DESTRUCTION ENVELOPE: Are you absolutely sure you want to permanently delete ALL saved logs across your profile?")) return;
+    if (!confirm("CRITICAL DESTRUCTION ENVELOPE: Clear ALL saved logs across your profile?")) return;
 
     setChatSessions([]);
     setMessages([]);
     generateNewSessionToken();
     setActiveSessionId(null);
+    setIsSidebarOpen(false);
 
     try {
       await fetch("/api/sessions?all=true", { method: "DELETE" });
@@ -256,6 +248,7 @@ export default function ChatPage() {
     setMessages([]);
     setActiveSessionId(null);
     setCurrentSessionId("");
+    setIsSidebarOpen(false);
   };
 
   const renderMessageContent = (text) => {
@@ -274,37 +267,52 @@ export default function ChatPage() {
   };
 
   return (
-    <div className={`flex h-screen font-sans transition-colors duration-300 ${
+    <div className={`flex h-screen font-sans overflow-hidden transition-colors duration-300 ${
       isDarkMode ? "bg-zinc-950 text-zinc-100" : "bg-zinc-50 text-zinc-900"
     }`}>
       
-      {/* Side Control/Navigation Workspace Column */}
-      <div className={`w-66 border-r flex flex-col justify-between p-4 transition-colors duration-300 ${
+      {/* Mobile Backdrop Overlay Curtain Mesh */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-40 lg:hidden transition-all duration-300"
+        />
+      )}
+
+      {/* Side Control Workspace - Responsive Sidebar */}
+      <div className={`fixed lg:static inset-y-0 left-0 w-64 border-r flex flex-col justify-between p-4 z-50 transform lg:transform-none transition-transform duration-300 ease-in-out ${
         isDarkMode ? "border-zinc-800 bg-zinc-900" : "border-zinc-200 bg-zinc-100"
-      }`}>
+      } ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+        
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2 text-orange-500 font-bold text-xl tracking-tight">
               <Cpu size={22} className={isTemporaryMode ? "text-purple-500" : "animate-pulse text-orange-500"} />
               <span>Z-engine</span>
             </div>
-            <button 
-              onClick={() => setIsDarkMode(!isDarkMode)} 
-              type="button"
-              className={`p-2 rounded-xl transition-all duration-200 border ${
-                isDarkMode 
-                  ? "bg-zinc-800 border-zinc-700 text-amber-400 hover:bg-zinc-700" 
-                  : "bg-zinc-200 border-zinc-300 text-indigo-600 hover:bg-zinc-300"
-              }`}
-            >
-              {isDarkMode ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setIsDarkMode(!isDarkMode)} 
+                type="button"
+                className={`p-2 rounded-xl border ${
+                  isDarkMode ? "bg-zinc-800 border-zinc-700 text-amber-400" : "bg-zinc-200 border-zinc-300 text-indigo-600"
+                }`}
+              >
+                {isDarkMode ? <Sun size={15} /> : <Moon size={15} />}
+              </button>
+              {/* Close Drawer Button for mobile viewports */}
+              <button 
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-2 rounded-xl border border-zinc-800 text-zinc-400 lg:hidden"
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
           
-          {/* Main Action Controllers */}
           <div className="flex flex-col gap-1.5 mb-4">
             <button
-              onClick={() => { setIsTemporaryMode(false); setMessages([]); generateNewSessionToken(); setActiveSessionId(null); }}
+              onClick={() => { setIsTemporaryMode(false); setMessages([]); generateNewSessionToken(); setActiveSessionId(null); setIsSidebarOpen(false); }}
               className={`w-full text-left font-mono text-xs p-2 rounded-lg border transition-all duration-200 ${
                 !isTemporaryMode && activeSessionId === null
                   ? "bg-orange-500/10 border-orange-500/30 text-orange-500 font-semibold"
@@ -322,40 +330,27 @@ export default function ChatPage() {
               }`}
             >
               <span>🕵️ Incognito Temp Chat</span>
-              {isTemporaryMode && <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-ping" />}
+              {isTemporaryMode && <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />}
             </button>
           </div>
           
           <div className="flex justify-between items-center mb-2">
-            <div className={`text-[10px] font-mono uppercase tracking-wider ${
-              isDarkMode ? "text-zinc-500" : "text-zinc-400"
-            }`}>Saved Registers</div>
-            
-            {/* Global Clear All Trigger Action */}
+            <div className={`text-[10px] font-mono uppercase tracking-wider ${isDarkMode ? "text-zinc-500" : "text-zinc-400"}`}>Saved Registers</div>
             {chatSessions.length > 0 && (
-              <button 
-                onClick={handleDeleteAllSessions}
-                type="button"
-                className="text-[10px] font-mono text-zinc-500 hover:text-red-500 flex items-center gap-0.5 transition-colors"
-              >
+              <button onClick={handleDeleteAllSessions} type="button" className="text-[10px] font-mono text-zinc-500 hover:text-red-500 flex items-center gap-0.5">
                 <Trash2 size={10} /> Purge All
               </button>
             )}
           </div>
           
-          {/* Historical Memory Scroll Area */}
           <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
             {chatSessions.map((chat) => (
               <div 
                 key={chat.id} 
                 className={`group flex items-center justify-between p-2 text-xs rounded-lg border font-mono transition-all duration-200 ${
                   currentSessionId === chat.session_id && !isTemporaryMode
-                    ? isDarkMode
-                      ? "bg-zinc-800 border-orange-500/40 text-zinc-100 shadow-md"
-                      : "bg-white border-orange-500 text-zinc-900 shadow-sm"
-                    : isDarkMode
-                      ? "bg-zinc-800/20 hover:bg-zinc-800/60 border-zinc-850 text-zinc-400 hover:text-zinc-200"
-                      : "bg-white/40 hover:bg-white border-zinc-200/60 text-zinc-500 hover:text-zinc-800"
+                    ? isDarkMode ? "bg-zinc-800 border-orange-500/40 text-zinc-100" : "bg-white border-orange-500 text-zinc-900"
+                    : isDarkMode ? "bg-zinc-800/20 border-zinc-850 text-zinc-400" : "bg-white/40 border-zinc-200/60 text-zinc-500"
                 }`}
               >
                 {editingSessionId === chat.session_id ? (
@@ -371,32 +366,19 @@ export default function ChatPage() {
                       autoFocus
                       className="flex-1 bg-zinc-950 text-zinc-100 border border-orange-500/50 rounded px-1 py-0.5 outline-none font-mono text-[11px]"
                     />
-                    <button onClick={() => submitRename(chat.session_id)} className="text-green-500 p-0.5 hover:bg-zinc-800 rounded"><Check size={12} /></button>
-                    <button onClick={() => setEditingSessionId(null)} className="text-zinc-500 p-0.5 hover:bg-zinc-800 rounded"><X size={12} /></button>
+                    <button onClick={() => submitRename(chat.session_id)} className="text-green-500 p-0.5"><Check size={12} /></button>
+                    <button onClick={() => setEditingSessionId(null)} className="text-zinc-500 p-0.5"><X size={12} /></button>
                   </div>
                 ) : (
                   <>
-                    <span 
-                      onClick={() => handleSelectSession(chat.session_id)} 
-                      className="truncate flex-1 cursor-pointer select-none text-[11px]"
-                    >
+                    <span onClick={() => handleSelectSession(chat.session_id)} className="truncate flex-1 cursor-pointer select-none text-[11px]">
                       {chat.title}
                     </span>
-                    
-                    {/* Multi-action toolbar container visible on hover interaction updates */}
-                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all shrink-0 ml-1">
-                      <button
-                        type="button"
-                        onClick={() => { setEditingSessionId(chat.session_id); setRenameValue(chat.title); }}
-                        className="p-0.5 rounded text-zinc-500 hover:text-orange-500 hover:bg-zinc-800/40 transition-all"
-                      >
+                    <div className="opacity-100 lg:opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all shrink-0 ml-1">
+                      <button type="button" onClick={() => { setEditingSessionId(chat.session_id); setRenameValue(chat.title); }} className="p-0.5 text-zinc-500 hover:text-orange-500">
                         <Edit2 size={11} />
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteSession(e, chat.session_id)}
-                        className="p-0.5 rounded text-zinc-500 hover:text-red-500 hover:bg-zinc-800/40 transition-all"
-                      >
+                      <button type="button" onClick={(e) => handleDeleteSession(e, chat.session_id)} className="p-0.5 text-zinc-500 hover:text-red-500">
                         <Trash2 size={11} />
                       </button>
                     </div>
@@ -407,10 +389,7 @@ export default function ChatPage() {
           </div>
         </div>
         
-        {/* User Identity Frame */}
-        <div className={`border-t pt-4 flex items-center justify-between mt-auto ${
-          isDarkMode ? "border-zinc-800" : "border-zinc-200"
-        }`}>
+        <div className={`border-t pt-4 flex items-center justify-between mt-auto ${isDarkMode ? "border-zinc-800" : "border-zinc-200"}`}>
           <div className="flex items-center gap-2 max-w-[140px] truncate">
             <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-mono border shrink-0 ${
               isDarkMode ? "bg-zinc-800 text-amber-500 border-zinc-700" : "bg-white text-indigo-600 border-zinc-300"
@@ -419,52 +398,58 @@ export default function ChatPage() {
             </div>
             <span className={`text-sm font-medium truncate ${isDarkMode ? "text-zinc-300" : "text-zinc-700"}`}>{session?.user?.name}</span>
           </div>
-          <button 
-            onClick={() => signOut()} 
-            type="button"
-            className={`p-1.5 rounded-lg transition-colors duration-200 ${
-              isDarkMode ? "text-zinc-500 hover:text-red-400 hover:bg-zinc-800" : "text-zinc-400 hover:text-red-500 hover:bg-zinc-200"
-            }`}
-          >
+          <button onClick={() => signOut()} type="button" className={`p-1.5 rounded-lg ${isDarkMode ? "text-zinc-500 hover:text-red-400" : "text-zinc-400 hover:text-red-500"}`}>
             <LogOut size={18} />
           </button>
         </div>
       </div>
 
       {/* Main Chat Workspace Canvas */}
-      <div className="flex-1 flex flex-col h-full">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        
+        {/* Mobile Top Header Navigation Bar */}
+        <div className={`lg:hidden flex items-center justify-between px-4 py-3 border-b transition-colors ${
+          isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-zinc-100 border-zinc-200"
+        }`}>
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className={`p-1.5 rounded-lg border ${isDarkMode ? "border-zinc-800 text-zinc-300" : "border-zinc-300 text-zinc-700"}`}
+          >
+            <Menu size={18} />
+          </button>
+          <span className="text-sm font-mono font-bold tracking-tight text-orange-500">Z-engine</span>
+          <div className="w-8 h-8" /> {/* Balance spacer layout */}
+        </div>
+
         {isTemporaryMode && (
-          <div className="bg-purple-950/30 border-b border-purple-900/40 px-6 py-2 flex items-center gap-2 text-xs text-purple-400 font-mono">
-            <ShieldAlert size={14} />
-            <span>Ephemeral Safe Mode Engaged: Conversations in this shell pipeline are transient and will not write to persistent registers.</span>
+          <div className="bg-purple-950/30 border-b border-purple-900/40 px-4 sm:px-6 py-2 flex items-center gap-2 text-[11px] sm:text-xs text-purple-400 font-mono">
+            <ShieldAlert size={13} className="shrink-0" />
+            <span className="truncate">Ephemeral Safe Mode Engaged: Conversations are transient.</span>
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Message Container Canvas */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-full">
           {messages.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-4">
+            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-4 px-4">
               <Terminal size={36} className={`animate-pulse ${isDarkMode ? "text-zinc-800" : "text-zinc-300"}`} />
               <h3 className={`text-md font-mono font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                {isTemporaryMode ? "Ephemeral Terminal Shell" : "Z-engine Core Console"}
+                {isTemporaryMode ? "Ephemeral Shell" : "Z-engine Console"}
               </h3>
               <p className={`text-xs leading-relaxed ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`}>
                 {isTemporaryMode 
-                  ? "This sandbox allows temporary command executions. Memory caches clear completely upon workspace mutation or panel closure."
-                  : "Inject scripts, manage container orchestration schemas, or launch debug sequences seamlessly."}
+                  ? "Sandbox console active. Memory caches wipe completely upon session mutation rules."
+                  : "Inject scripts, manage architecture schemas, or launch code validation runs."}
               </p>
             </div>
           )}
 
           {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-3xl rounded-xl px-4 py-2.5 text-sm leading-relaxed transition-all duration-200 border ${
+            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} max-w-full`}>
+              <div className={`max-w-[88%] sm:max-w-3xl rounded-xl px-3.5 py-2 text-xs sm:text-sm leading-relaxed border break-words ${
                 msg.role === "user" 
-                  ? isDarkMode
-                    ? "bg-zinc-800/90 text-zinc-100 border-zinc-700/80 shadow-sm" 
-                    : "bg-white text-zinc-800 border-zinc-200 shadow-sm"
-                  : isDarkMode
-                    ? "bg-zinc-900/40 text-zinc-200 border-zinc-850/80 font-mono" 
-                    : "bg-zinc-100 text-zinc-800 border-zinc-200/60 font-mono"
+                  ? isDarkMode ? "bg-zinc-800 text-zinc-100 border-zinc-700/80" : "bg-white text-zinc-800 border-zinc-200"
+                  : isDarkMode ? "bg-zinc-900/40 text-zinc-200 border-zinc-850/80 font-mono" : "bg-zinc-100 text-zinc-800 border-zinc-200/60 font-mono"
               }`}>
                 {msg.role === "user" ? msg.text : renderMessageContent(msg.text)}
               </div>
@@ -472,7 +457,7 @@ export default function ChatPage() {
           ))}
           {loading && (
             <div className="flex justify-start">
-              <div className={`border rounded-xl px-4 py-2.5 text-xs font-mono animate-pulse transition-colors duration-200 ${
+              <div className={`border rounded-xl px-3.5 py-2 text-xs font-mono animate-pulse ${
                 isDarkMode ? "bg-zinc-900/80 text-zinc-500 border-zinc-850" : "bg-zinc-100 text-zinc-400 border-zinc-200"
               }`}>
                 Executing runtime lookup...
@@ -482,19 +467,19 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Control Console Bar */}
-        <form onSubmit={handleSendMessage} className={`p-4 border-t transition-colors duration-300 ${
+        {/* Input Bar Footer */}
+        <form onSubmit={handleSendMessage} className={`p-3 sm:p-4 border-t transition-colors ${
           isDarkMode ? "border-zinc-800 bg-zinc-900/30" : "border-zinc-200 bg-zinc-100/50"
         }`}>
-          <div className="max-w-4xl mx-auto flex gap-3 items-center">
+          <div className="max-w-4xl mx-auto flex gap-2 sm:gap-3 items-center">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={isTemporaryMode ? "Inject ephemeral script statements..." : "Inject statement or coding prompt..."}
-              className={`flex-1 border rounded-xl px-4 py-3 text-sm focus:outline-none font-mono transition-all duration-200 ${
+              placeholder={isTemporaryMode ? "Inject ephemeral scripts..." : "Inject statement or prompt..."}
+              className={`flex-1 border rounded-xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none font-mono transition-all duration-200 min-w-0 ${
                 isTemporaryMode
-                  ? "focus:border-purple-500/50 bg-zinc-950 border-purple-950 text-zinc-100 placeholder-purple-900/60"
+                  ? "focus:border-purple-500/50 bg-zinc-950 border-purple-950 text-zinc-100 placeholder-purple-900/40"
                   : isDarkMode 
                     ? "bg-zinc-950 border-zinc-800 text-zinc-100 placeholder-zinc-700 focus:border-orange-500/50" 
                     : "bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500/50"
@@ -503,13 +488,13 @@ export default function ChatPage() {
             <button 
               type="submit" 
               disabled={loading} 
-              className={`p-3 rounded-xl disabled:opacity-50 transition-all duration-200 shadow-sm ${
+              className={`p-2.5 sm:p-3 rounded-xl disabled:opacity-50 transition-all duration-200 shrink-0 ${
                 isTemporaryMode 
                   ? "bg-purple-600 hover:bg-purple-500 text-white"
                   : isDarkMode ? "bg-zinc-50 hover:bg-zinc-200 text-zinc-950" : "bg-zinc-900 hover:bg-zinc-800 text-zinc-50"
               }`}
             >
-              <Send size={16} />
+              <Send size={15} />
             </button>
           </div>
         </form>
