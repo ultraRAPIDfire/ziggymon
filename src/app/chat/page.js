@@ -63,8 +63,12 @@ export default function ChatPage() {
 
       const data = await response.json();
       
-      // Dynamically extract text regardless of how your n8n Respond Node is structured
-      const aiText = data.response || data.output || data.text || (typeof data === "string" ? data : JSON.stringify(data));
+      // Unwrap the n8n execution array layer if present
+      const payload = Array.isArray(data) ? data[0] : data;
+      
+      // Dynamically extract text keys safely from parsed payload object
+      const aiText = payload?.response || payload?.output || payload?.text || 
+                     (typeof payload === "string" ? payload : JSON.stringify(payload));
       
       setMessages((prev) => [
         ...prev,
