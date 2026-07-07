@@ -12,8 +12,9 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [chatSessions, setChatSessions] = useState([]);
   
-  // Track a dedicated, unique session ID per page instance
+  // Track states for historic session lookup tracking
   const [currentSessionId, setCurrentSessionId] = useState("");
+  const [activeSessionId, setActiveSessionId] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Initialize a unique session ID once authenticated
@@ -50,6 +51,23 @@ export default function ChatPage() {
     return <div className="flex h-screen items-center justify-center bg-zinc-950 text-zinc-400 font-mono">Loading Environment...</div>;
   }
 
+  // Fetch historic data logs for selected chat frame
+  const handleSelectSession = async (sessionId) => {
+    setLoading(true);
+    setActiveSessionId(sessionId);
+    setCurrentSessionId(sessionId); // Bind current prompt executions to historic line context
+    
+    try {
+      const res = await fetch(`/api/messages?sessionId=${sessionId}`);
+      const historicalMessages = await res.json();
+      setMessages(historicalMessages || []);
+    } catch (error) {
+      console.error("Failed to retrieve chat logs:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
@@ -67,8 +85,8 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: input,
-          sessionId: currentSessionId, // Passes the unique session identifier to pass database rules
-          userEmail: session?.user?.email || "anonymous", // Still passes the user profile mapping smoothly
+          sessionId: currentSessionId, 
+          userEmail: session?.user?.email || "anonymous", 
         }),
       });
 
@@ -113,7 +131,12 @@ export default function ChatPage() {
             {chatSessions.map((chat) => (
               <div 
                 key={chat.id} 
-                className="p-2 text-xs rounded-lg bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-800/80 cursor-pointer truncate text-zinc-400 hover:text-zinc-200 font-mono transition-colors"
+                onClick={() => handleSelectSession(chat.session_id)}
+                className={`p-2 text-xs rounded-lg border cursor-pointer truncate font-mono transition-colors ${
+                  currentSessionId === chat.session_id 
+                    ? "bg-zinc-800 border-orange-500/50 text-zinc-100" 
+                    : "bg-zinc-800/40 hover:bg-zinc-800 border-zinc-800/80 text-zinc-400 hover:text-zinc-200"
+                }`}
               >
                 {chat.title}
               </div>
