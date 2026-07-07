@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Send, LogOut, Terminal, Cpu, Sun, Moon, Check, Copy, Edit2 } from "lucide-react";
+import { Send, LogOut, Terminal, Cpu, Sun, Moon, Check, Copy, Edit2, X, ShieldAlert } from "lucide-react";
 
 // Sub-component to manage copy interaction cleanly for code snippets
 function CodeSnippetBlock({ code, language }) {
@@ -55,11 +55,17 @@ export default function ChatPage() {
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
 
+  // Ephemeral mode state configuration
+  const [isTemporaryMode, setIsTemporaryMode] = useState(false);
+
+  // Reference tracker to discard race conditions on fast session swaps
+  const abortControllerRef = useRef(null);
+
   useEffect(() => {
-    if (status === "authenticated" && !currentSessionId) {
+    if (status === "authenticated" && !currentSessionId && !isTemporaryMode) {
       generateNewSessionToken();
     }
-  }, [status, currentSessionId]);
+  }, [status, currentSessionId, isTemporaryMode]);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -100,18 +106,33 @@ export default function ChatPage() {
   }
 
   const handleSelectSession = async (sessionId) => {
+    // Drop temporary mode if a user jumps back to historical review records
+    setIsTemporaryMode(false);
+
+    // Cancel any older database lookup requests currently mid-flight
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     setActiveSessionId(sessionId);
     setCurrentSessionId(sessionId); 
     
     try {
-      const res = await fetch(`/api/messages?sessionId=${sessionId}`);
+      const res = await fetch(`/api/messages?sessionId=${sessionId}`, {
+        signal: controller.signal
+      });
       const historicalMessages = await res.json();
       setMessages(historicalMessages || []);
+      setLoading(false); // Clear loading state inside normal flow path
     } catch (error) {
-      console.error("Failed to retrieve chat logs:", error);
-    } finally {
-      setLoading(false); 
+      if (error.name !== "AbortError") {
+        console.error("Failed to retrieve chat logs:", error);
+        setLoading(false);
+      }
     }
   };
 
@@ -120,12 +141,11 @@ export default function ChatPage() {
     if (!input.trim() || loading) return;
 
     const userMessage = { role: "user", text: input };
-    const trackingInput = input; // Snapshot reference
+    const trackingInput = input;
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
 
-    // Track if this message is initiating a fresh historical thread sequence
     const isBrandNewSession = !chatSessions.some(s => s.session_id === currentSessionId);
 
     try {
@@ -136,8 +156,10 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: trackingInput,
-          sessionId: currentSessionId, 
-          userEmail: session?.user?.email || "anonymous", 
+          // Send an empty string or dummy token to bypass database parameters if in temporary mode
+          sessionId: isTemporaryMode ? `temp_${Date.now()}` : currentSessionId, 
+          userEmail: isTemporaryMode ? "ephemeral_session" : (session?.user?.email || "anonymous"),
+          isTemporary: isTemporaryMode // Let n8n know to skip logging rows if desired
         }),
       });
 
@@ -151,10 +173,9 @@ export default function ChatPage() {
         { role: "assistant", text: aiText || "No readable string payload returned from network." },
       ]);
 
-      // Reactive Step: Append session metadata to sidebar instantly without page refreshing
-      if (isBrandNewSession) {
+      if (isBrandNewSession && !isTemporaryMode) {
         const structuralSessionMock = {
-          id: Date.now(), // Local key identifier placeholder
+          id: Date.now(), 
           session_id: currentSessionId,
           title: trackingInput.substring(0, 24) || "New Active Session",
           user_email: session?.user?.email || "anonymous"
@@ -172,11 +193,12 @@ export default function ChatPage() {
     }
   };
 
-  // Triggers title rename actions locally & saves updates back downstream
   const submitRename = async (sessionId) => {
-    if (!renameValue.trim()) return;
+    if (!renameValue.trim()) {
+      setEditingSessionId(null);
+      return;
+    }
     
-    // Update frontend state instantaneously
     setChatSessions((prev) =>
       prev.map((s) => (s.session_id === sessionId ? { ...s, title: renameValue } : s))
     );
@@ -191,6 +213,13 @@ export default function ChatPage() {
     } catch (err) {
       console.error("Failed to commit session title update:", err);
     }
+  };
+
+  const toggleTemporaryMode = () => {
+    setIsTemporaryMode(true);
+    setMessages([]);
+    setActiveSessionId(null);
+    setCurrentSessionId("");
   };
 
   const renderMessageContent = (text) => {
@@ -220,7 +249,7 @@ export default function ChatPage() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2 text-orange-500 font-bold text-xl tracking-tight">
-              <Cpu size={22} className="animate-pulse text-orange-500" />
+              <Cpu size={22} className={isTemporaryMode ? "text-purple-500" : "animate-pulse text-orange-500"} />
               <span>Z-engine</span>
             </div>
             <button 
@@ -236,27 +265,44 @@ export default function ChatPage() {
             </button>
           </div>
           
-          <div className="flex justify-between items-center mb-2">
-            <div className={`text-[11px] font-mono uppercase tracking-wider ${
-              isDarkMode ? "text-zinc-500" : "text-zinc-400"
-            }`}>Active Dev Sessions</div>
-            <button 
-              onClick={() => { setMessages([]); generateNewSessionToken(); setActiveSessionId(null); }}
-              className="text-[11px] font-mono text-orange-500 hover:text-orange-400 px-1 rounded transition-colors"
+          {/* Main Action Controllers */}
+          <div className="flex flex-col gap-1.5 mb-4">
+            <button
+              onClick={() => { setIsTemporaryMode(false); setMessages([]); generateNewSessionToken(); setActiveSessionId(null); }}
+              className={`w-full text-left font-mono text-xs p-2 rounded-lg border transition-all duration-200 ${
+                !isTemporaryMode && activeSessionId === null
+                  ? "bg-orange-500/10 border-orange-500/30 text-orange-500 font-semibold"
+                  : isDarkMode ? "bg-zinc-800/20 border-zinc-850 text-zinc-400 hover:bg-zinc-800/50" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+              }`}
             >
-              + New
+              + Standard Session
+            </button>
+            <button
+              onClick={toggleTemporaryMode}
+              className={`w-full text-left font-mono text-xs p-2 rounded-lg border transition-all duration-200 flex items-center justify-between ${
+                isTemporaryMode
+                  ? "bg-purple-500/10 border-purple-500/40 text-purple-400 font-semibold"
+                  : isDarkMode ? "bg-zinc-800/20 border-zinc-850 text-zinc-400 hover:bg-zinc-800/50" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+              }`}
+            >
+              <span>🕵️ Incognito Temp Chat</span>
+              {isTemporaryMode && <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-ping" />}
             </button>
           </div>
           
-          {/* Historical Memory Scroll Container Area */}
+          <div className={`text-[10px] font-mono uppercase tracking-wider mb-2 ${
+            isDarkMode ? "text-zinc-500" : "text-zinc-400"
+          }`}>Saved Registers</div>
+          
+          {/* Historical Memory Scroll Area */}
           <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
             {chatSessions.map((chat) => (
               <div 
                 key={chat.id} 
                 className={`group flex items-center justify-between p-2 text-xs rounded-lg border font-mono transition-all duration-200 ${
-                  currentSessionId === chat.session_id 
+                  currentSessionId === chat.session_id && !isTemporaryMode
                     ? isDarkMode
-                      ? "bg-zinc-800 border-orange-500/40 text-zinc-100 shadow-md shadow-orange-500/5"
+                      ? "bg-zinc-800 border-orange-500/40 text-zinc-100 shadow-md"
                       : "bg-white border-orange-500 text-zinc-900 shadow-sm"
                     : isDarkMode
                       ? "bg-zinc-800/20 hover:bg-zinc-800/60 border-zinc-850 text-zinc-400 hover:text-zinc-200"
@@ -264,15 +310,21 @@ export default function ChatPage() {
                 }`}
               >
                 {editingSessionId === chat.session_id ? (
-                  <input
-                    type="text"
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onBlur={() => submitRename(chat.session_id)}
-                    onKeyDown={(e) => e.key === "Enter" && submitRename(chat.session_id)}
-                    autoFocus
-                    className="w-full bg-zinc-950 text-zinc-100 border border-orange-500/50 rounded px-1.5 py-0.5 outline-none font-mono text-[11px]"
-                  />
+                  <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitRename(chat.session_id);
+                        if (e.key === "Escape") setEditingSessionId(null);
+                      }}
+                      autoFocus
+                      className="flex-1 bg-zinc-950 text-zinc-100 border border-orange-500/50 rounded px-1 py-0.5 outline-none font-mono text-[11px]"
+                    />
+                    <button onClick={() => submitRename(chat.session_id)} className="text-green-500 p-0.5 hover:bg-zinc-800 rounded"><Check size={12} /></button>
+                    <button onClick={() => setEditingSessionId(null)} className="text-zinc-500 p-0.5 hover:bg-zinc-800 rounded"><X size={12} /></button>
+                  </div>
                 ) : (
                   <>
                     <span 
@@ -286,7 +338,7 @@ export default function ChatPage() {
                       onClick={() => { setEditingSessionId(chat.session_id); setRenameValue(chat.title); }}
                       className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-orange-500 transition-all shrink-0 ml-1"
                     >
-                      <Edit2 size={12} />
+                      <Edit2 size={11} />
                     </button>
                   </>
                 )}
@@ -321,12 +373,25 @@ export default function ChatPage() {
 
       {/* Main Chat Workspace Canvas */}
       <div className="flex-1 flex flex-col h-full">
+        {isTemporaryMode && (
+          <div className="bg-purple-950/30 border-b border-purple-900/40 px-6 py-2 flex items-center gap-2 text-xs text-purple-400 font-mono">
+            <ShieldAlert size={14} />
+            <span>Ephemeral Safe Mode Engaged: Conversations in this shell pipeline are transient and will not write to persistent registers.</span>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-4">
               <Terminal size={36} className={`animate-pulse ${isDarkMode ? "text-zinc-800" : "text-zinc-300"}`} />
-              <h3 className={`text-md font-mono font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>Z-engine Core Console</h3>
-              <p className={`text-xs leading-relaxed ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`}>Inject scripts, manage container orchestration schemas, or launch debug sequences seamlessly.</p>
+              <h3 className={`text-md font-mono font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                {isTemporaryMode ? "Ephemeral Terminal Shell" : "Z-engine Core Console"}
+              </h3>
+              <p className={`text-xs leading-relaxed ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`}>
+                {isTemporaryMode 
+                  ? "This sandbox allows temporary command executions. Memory caches clear completely upon workspace mutation or panel closure."
+                  : "Inject scripts, manage container orchestration schemas, or launch debug sequences seamlessly."}
+              </p>
             </div>
           )}
 
@@ -366,18 +431,22 @@ export default function ChatPage() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Inject statement or coding prompt..."
-              className={`flex-1 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500/50 font-mono transition-all duration-200 ${
-                isDarkMode 
-                  ? "bg-zinc-950 border-zinc-800 text-zinc-100 placeholder-zinc-700" 
-                  : "bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400"
+              placeholder={isTemporaryMode ? "Inject ephemeral script statements..." : "Inject statement or coding prompt..."}
+              className={`flex-1 border rounded-xl px-4 py-3 text-sm focus:outline-none font-mono transition-all duration-200 ${
+                isTemporaryMode
+                  ? "focus:border-purple-500/50 bg-zinc-950 border-purple-950 text-zinc-100 placeholder-purple-900/60"
+                  : isDarkMode 
+                    ? "bg-zinc-950 border-zinc-800 text-zinc-100 placeholder-zinc-700 focus:border-orange-500/50" 
+                    : "bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-orange-500/50"
               }`}
             />
             <button 
               type="submit" 
               disabled={loading} 
               className={`p-3 rounded-xl disabled:opacity-50 transition-all duration-200 shadow-sm ${
-                isDarkMode ? "bg-zinc-50 hover:bg-zinc-200 text-zinc-950" : "bg-zinc-900 hover:bg-zinc-800 text-zinc-50"
+                isTemporaryMode 
+                  ? "bg-purple-600 hover:bg-purple-500 text-white"
+                  : isDarkMode ? "bg-zinc-50 hover:bg-zinc-200 text-zinc-950" : "bg-zinc-900 hover:bg-zinc-800 text-zinc-50"
               }`}
             >
               <Send size={16} />
