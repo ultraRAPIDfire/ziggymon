@@ -49,14 +49,17 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: input,
-          sessionId: session?.user?.email || "anonymous_session",
-        }),
-      });
+    // Hard-code a fallback check right inside the call to prevent compilation dropouts
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || "https://n8n.srv1769884.hstgr.cloud/webhook/chat";
+
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: input,
+        sessionId: session?.user?.email || "anonymous_session",
+      }),
+    });
 
       const data = await response.json();
       
