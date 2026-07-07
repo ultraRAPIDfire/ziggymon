@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Send, LogOut, Terminal, Cpu, Sun, Moon, Check, Copy, Edit2, X, ShieldAlert } from "lucide-react";
+import { Send, LogOut, Terminal, Cpu, Sun, Moon, Check, Copy, Edit2, X, ShieldAlert, Trash2 } from "lucide-react";
 
 // Sub-component to manage copy interaction cleanly for code snippets
 function CodeSnippetBlock({ code, language }) {
@@ -106,10 +106,8 @@ export default function ChatPage() {
   }
 
   const handleSelectSession = async (sessionId) => {
-    // Drop temporary mode if a user jumps back to historical review records
     setIsTemporaryMode(false);
 
-    // Cancel any older database lookup requests currently mid-flight
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -127,7 +125,7 @@ export default function ChatPage() {
       });
       const historicalMessages = await res.json();
       setMessages(historicalMessages || []);
-      setLoading(false); // Clear loading state inside normal flow path
+      setLoading(false);
     } catch (error) {
       if (error.name !== "AbortError") {
         console.error("Failed to retrieve chat logs:", error);
@@ -156,10 +154,9 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: trackingInput,
-          // Send an empty string or dummy token to bypass database parameters if in temporary mode
           sessionId: isTemporaryMode ? `temp_${Date.now()}` : currentSessionId, 
           userEmail: isTemporaryMode ? "ephemeral_session" : (session?.user?.email || "anonymous"),
-          isTemporary: isTemporaryMode // Let n8n know to skip logging rows if desired
+          isTemporary: isTemporaryMode 
         }),
       });
 
@@ -212,6 +209,45 @@ export default function ChatPage() {
       });
     } catch (err) {
       console.error("Failed to commit session title update:", err);
+    }
+  };
+
+  // Feature: Delete single active session item row context
+  const handleDeleteSession = async (e, sessionId) => {
+    e.stopPropagation(); // Avoid triggering chat row selection on click event bubbles
+    
+    if (!confirm("Confirm removal of this transaction matrix register?")) return;
+
+    // Reactively purge item from local tracking list states instantly
+    setChatSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
+    
+    // Clear chat canvas viewport frame if the user purges the conversation they are looking at
+    if (currentSessionId === sessionId) {
+      setMessages([]);
+      generateNewSessionToken();
+      setActiveSessionId(null);
+    }
+
+    try {
+      await fetch(`/api/sessions?sessionId=${sessionId}`, { method: "DELETE" });
+    } catch (err) {
+      console.error("Failed to clear backend target registry:", err);
+    }
+  };
+
+  // Feature: Wipe out entire directory stack sequence
+  const handleDeleteAllSessions = async () => {
+    if (!confirm("CRITICAL DESTRUCTION ENVELOPE: Are you absolutely sure you want to permanently delete ALL saved logs across your profile?")) return;
+
+    setChatSessions([]);
+    setMessages([]);
+    generateNewSessionToken();
+    setActiveSessionId(null);
+
+    try {
+      await fetch("/api/sessions?all=true", { method: "DELETE" });
+    } catch (err) {
+      console.error("Failed to complete global environment batch cleanup:", err);
     }
   };
 
@@ -290,9 +326,22 @@ export default function ChatPage() {
             </button>
           </div>
           
-          <div className={`text-[10px] font-mono uppercase tracking-wider mb-2 ${
-            isDarkMode ? "text-zinc-500" : "text-zinc-400"
-          }`}>Saved Registers</div>
+          <div className="flex justify-between items-center mb-2">
+            <div className={`text-[10px] font-mono uppercase tracking-wider ${
+              isDarkMode ? "text-zinc-500" : "text-zinc-400"
+            }`}>Saved Registers</div>
+            
+            {/* Global Clear All Trigger Action */}
+            {chatSessions.length > 0 && (
+              <button 
+                onClick={handleDeleteAllSessions}
+                type="button"
+                className="text-[10px] font-mono text-zinc-500 hover:text-red-500 flex items-center gap-0.5 transition-colors"
+              >
+                <Trash2 size={10} /> Purge All
+              </button>
+            )}
+          </div>
           
           {/* Historical Memory Scroll Area */}
           <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
@@ -329,17 +378,28 @@ export default function ChatPage() {
                   <>
                     <span 
                       onClick={() => handleSelectSession(chat.session_id)} 
-                      className="truncate flex-1 cursor-pointer select-none"
+                      className="truncate flex-1 cursor-pointer select-none text-[11px]"
                     >
                       {chat.title}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => { setEditingSessionId(chat.session_id); setRenameValue(chat.title); }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-orange-500 transition-all shrink-0 ml-1"
-                    >
-                      <Edit2 size={11} />
-                    </button>
+                    
+                    {/* Multi-action toolbar container visible on hover interaction updates */}
+                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all shrink-0 ml-1">
+                      <button
+                        type="button"
+                        onClick={() => { setEditingSessionId(chat.session_id); setRenameValue(chat.title); }}
+                        className="p-0.5 rounded text-zinc-500 hover:text-orange-500 hover:bg-zinc-800/40 transition-all"
+                      >
+                        <Edit2 size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteSession(e, chat.session_id)}
+                        className="p-0.5 rounded text-zinc-500 hover:text-red-500 hover:bg-zinc-800/40 transition-all"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
