@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize Supabase client on the server side using local environment keys
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Force Next.js to skip pre-rendering this endpoint during the build phase
+export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
@@ -16,10 +14,17 @@ export async function GET(request) {
       return NextResponse.json({ error: "Missing sessionId parameter" }, { status: 400 });
     }
 
+    // Safely pull keys within the runtime context with fallbacks to protect the build phase
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder_key";
+    
+    // Initialize inside the request boundary
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
     // Query your messages table for entries matching this session
     // Ordered oldest to newest so they append down your terminal screen chronologically
     const { data: messages, error } = await supabase
-      .from("chat_messages") // Ensure this matches your actual messages table name in Supabase
+      .from("chat_messages") 
       .select("role, text")
       .eq("session_id", sessionId)
       .order("created_at", { ascending: true });
