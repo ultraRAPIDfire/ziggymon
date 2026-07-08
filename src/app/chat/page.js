@@ -380,17 +380,18 @@ export default function ChatPage() {
             >
               + NEW_SHELL_SESSION
             </button>
-            <button
-              onClick={toggleTemporaryMode}
-              className={`w-full text-left font-mono text-xs p-2.5 rounded-xl border transition-all duration-300 transform active:scale-[0.98] flex items-center justify-between ${
-                isTemporaryMode
-                  ? "bg-purple-500/10 border-purple-500/30 text-purple-400 font-bold shadow-lg shadow-purple-500/5"
-                  : isDarkMode ? "bg-zinc-800/30 border-zinc-850/80 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              <span>🕵️ EPHEMERAL_SANDBOX</span>
-              {isTemporaryMode && <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-ping" />}
-            </button>
+            {/* Change this button inside src/app/chat/page.js */}
+              <button
+                onClick={toggleTemporaryMode} /* 💡 Changed to lowercase 'm' */
+                className={`w-full text-left font-mono text-xs p-2.5 rounded-xl border transition-all duration-300 transform active:scale-[0.98] flex items-center justify-between ${
+                  isTemporaryMode
+                    ? "bg-purple-500/10 border-purple-500/30 text-purple-400 font-bold shadow-lg shadow-purple-500/5"
+                    : isDarkMode ? "bg-zinc-800/30 border-zinc-850/80 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                }`}
+              >
+                <span>🕵️ EPHEMERAL_SANDBOX</span>
+                {isTemporaryMode && <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-ping" />}
+              </button>
           </div>
           
           <div className="flex justify-between items-center mb-2 px-1">
