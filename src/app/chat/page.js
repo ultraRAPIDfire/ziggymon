@@ -4,7 +4,6 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Send, LogOut, Terminal, Cpu, Sun, Moon, Check, Copy, Edit2, X, ShieldAlert, Trash2, Menu, AlertTriangle } from "lucide-react";
 
-// Premium Code Highlight & Copy Block Component
 function CodeSnippetBlock({ code, language }) {
   const [copied, setCopied] = useState(false);
 
@@ -41,7 +40,6 @@ function CodeSnippetBlock({ code, language }) {
   );
 }
 
-// Custom UI Modal Confirmation Component
 function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel, isCritical }) {
   if (!isOpen) return null;
   return (
@@ -98,7 +96,6 @@ export default function ChatPage() {
   const [isTemporaryMode, setIsTemporaryMode] = useState(false);
   const abortControllerRef = useRef(null);
 
-  // Modal State Management
   const [modalConfig, setModalConfig] = useState({ isOpen: false, title: "", message: "", onConfirm: () => {}, isCritical: false });
 
   useEffect(() => {
@@ -133,6 +130,15 @@ export default function ChatPage() {
       .then((res) => res.json())
       .then((data) => setChatSessions(data || []))
       .catch(() => {});
+  };
+
+  // 💡 Explicit function name definition
+  const toggleTemporaryMode = () => {
+    setIsTemporaryMode(true);
+    setMessages([]);
+    setActiveSessionId(null);
+    setCurrentSessionId("");
+    setIsSidebarOpen(false);
   };
 
   if (status === "loading") {
@@ -251,7 +257,6 @@ export default function ChatPage() {
     }
   };
 
-  // Custom UI Deletion Triggers
   const triggerDeleteSession = (e, sessionId) => {
     e.stopPropagation();
     setModalConfig({
@@ -318,7 +323,6 @@ export default function ChatPage() {
       isDarkMode ? "bg-zinc-950 text-zinc-100" : "bg-zinc-50 text-zinc-900"
     }`}>
       
-      {/* Animated Confirmation Overlay UI Modal */}
       <ConfirmationModal 
         isOpen={modalConfig.isOpen}
         title={modalConfig.title}
@@ -328,10 +332,8 @@ export default function ChatPage() {
         onCancel={() => setModalConfig((prev) => ({ ...prev, isOpen: false }))}
       />
 
-      {/* Cyberpunk Grid Background Layer */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808004_1px,transparent_1px),linear-gradient(to_bottom,#80808004_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none z-0" />
 
-      {/* Mobile Sidebar Slide Overlay Curtain */}
       {isSidebarOpen && (
         <div 
           onClick={() => setIsSidebarOpen(false)}
@@ -339,7 +341,6 @@ export default function ChatPage() {
         />
       )}
 
-      {/* Left Sidebar Control Dashboard Column */}
       <div className={`fixed lg:static inset-y-0 left-0 w-66 border-r flex flex-col justify-between p-4 z-50 transform lg:transform-none transition-transform duration-300 ease-in-out backdrop-blur-2xl ${
         isDarkMode ? "border-zinc-800/80 bg-zinc-900/60" : "border-zinc-200 bg-zinc-100/90"
       } ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
@@ -380,18 +381,19 @@ export default function ChatPage() {
             >
               + NEW_SHELL_SESSION
             </button>
-            {/* Change this button inside src/app/chat/page.js */}
-              <button
-                onClick={toggleTemporaryMode} /* 💡 Changed to lowercase 'm' */
-                className={`w-full text-left font-mono text-xs p-2.5 rounded-xl border transition-all duration-300 transform active:scale-[0.98] flex items-center justify-between ${
-                  isTemporaryMode
-                    ? "bg-purple-500/10 border-purple-500/30 text-purple-400 font-bold shadow-lg shadow-purple-500/5"
-                    : isDarkMode ? "bg-zinc-800/30 border-zinc-850/80 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-                }`}
-              >
-                <span>🕵️ EPHEMERAL_SANDBOX</span>
-                {isTemporaryMode && <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-ping" />}
-              </button>
+            
+            {/* 💡 Explicitly structured button call reference targeting the click action safely */}
+            <button
+              onClick={toggleTemporaryMode}
+              className={`w-full text-left font-mono text-xs p-2.5 rounded-xl border transition-all duration-300 transform active:scale-[0.98] flex items-center justify-between ${
+                isTemporaryMode
+                  ? "bg-purple-500/10 border-purple-500/30 text-purple-400 font-bold shadow-lg shadow-purple-500/5"
+                  : isDarkMode ? "bg-zinc-800/30 border-zinc-850/80 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200" : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+              }`}
+            >
+              <span>🕵️ EPHEMERAL_SANDBOX</span>
+              {isTemporaryMode && <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-ping" />}
+            </button>
           </div>
           
           <div className="flex justify-between items-center mb-2 px-1">
@@ -464,10 +466,8 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Right Main Chat Core Window Workspace Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden z-10">
         
-        {/* Mobile Navbar Header */}
         <div className={`lg:hidden flex items-center justify-between px-4 py-3 border-b backdrop-blur-md transition-colors ${
           isDarkMode ? "bg-zinc-950/80 border-zinc-800/80" : "bg-zinc-50/80 border-zinc-200"
         }`}>
@@ -488,7 +488,6 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Message Container Stream Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-full custom-scrollbar bg-transparent">
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-4 px-4 animate-fadeIn">
@@ -496,7 +495,7 @@ export default function ChatPage() {
                 <Terminal size={28} className={isDarkMode ? "text-zinc-700 animate-pulse" : "text-zinc-400"} />
               </div>
               <h3 className={`text-xs font-mono font-bold uppercase tracking-widest ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
-                {isTemporaryMode ? "Sandbox Terminal Core" : "System Central Console"}
+                System Central Console
               </h3>
               <p className={`text-[11px] leading-relaxed max-w-xs ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`}>
                 Awaiting programmatic prompt initialization parameters. Inject statement arrays or debugging workflows below.
@@ -507,12 +506,10 @@ export default function ChatPage() {
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} max-w-full animate-messageSlide`}>
               {msg.role === "user" ? (
-                /* Premium User Text Layout Panel */
                 <div className="max-w-[85%] sm:max-w-2xl rounded-2xl rounded-br-sm px-4 py-3 text-xs sm:text-sm leading-relaxed font-sans bg-zinc-800 text-zinc-100 border border-zinc-700/60 shadow-lg">
                   {msg.text}
                 </div>
               ) : (
-                /* Premium AI Agent Grid Layout Frame */
                 <div className={`max-w-[92%] sm:max-w-3xl rounded-2xl rounded-bl-sm px-4 py-3.5 text-xs sm:text-sm leading-relaxed font-mono border shadow-md relative group/ai ${
                   isDarkMode ? "bg-zinc-900/40 border-zinc-800 text-zinc-300 backdrop-blur-md" : "bg-white border-zinc-200 text-zinc-800"
                 }`}>
@@ -537,7 +534,6 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Console Input Bar Layout Container Footer */}
         <form onSubmit={handleSendMessage} className={`p-3 sm:p-4 border-t backdrop-blur-md transition-colors ${
           isDarkMode ? "border-zinc-800/80 bg-zinc-950/40" : "border-zinc-200 bg-zinc-50/60"
         }`}>
